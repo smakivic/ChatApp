@@ -4,9 +4,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.util.Base64
+import android.util.Log
 import android.view.View
 import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.example.myapplication.R
@@ -25,10 +25,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class ChatActivity : AppCompatActivity() {
+class ChatActivity : BaseActivity() {
 
     private lateinit var binding: ActivityChatBinding
-//  private lateinit var preferenceManager: PreferenceManager
     private lateinit var receiverUser: User
 
 
@@ -37,6 +36,7 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var preferenceManager: PreferenceManager
     private lateinit var database: FirebaseFirestore
     private var conversationId: String? = null
+    private var isReceiverAvailable: Boolean = false
 
 
 
@@ -50,9 +50,9 @@ class ChatActivity : AppCompatActivity() {
             insets
         }
 
-        binding = ActivityChatBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        loadRecieverDetails()
+        this.binding = ActivityChatBinding.inflate(layoutInflater)
+        setContentView(this.binding.root)
+        loadReceiverDetails()
         setListeners()
         init()
         listenMessages()
@@ -99,17 +99,89 @@ class ChatActivity : AppCompatActivity() {
         binding.inputMessage.text = null
     }
 
+    private fun listenAvailabilityOfReceiver() {
+        database.collection(Constants.KEY_COLLECTION_USERS).document(receiverUser.id)
+            .addSnapshotListener(this) { value, error ->
+                if (error != null) {
+                    return@addSnapshotListener
+                }
+                if (value != null) {
+                    val availability = value.getLong(Constants.KEY_AVAILABILITY)?.toInt()
+                    isReceiverAvailable = availability == 1
+                }
+
+                if (isReceiverAvailable) {
+                    binding.textAvailability.visibility = View.VISIBLE
+                } else {
+                    binding.textAvailability.visibility = View.GONE
+                }
+            }
+    }
+
+
+
     private fun listenMessages() {
-        database.collection(Constants.KEY_COLLECTION_CHAT)
-            .whereEqualTo(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID))
-            .whereEqualTo(Constants.KEY_RECEIVER_ID, receiverUser.id)
-            .addSnapshotListener(eventListener)
+        val currentUserId = preferenceManager.getString(Constants.KEY_USER_ID) ?: ""
+        val receiverId = receiverUser.id
 
         database.collection(Constants.KEY_COLLECTION_CHAT)
-            .whereEqualTo(Constants.KEY_SENDER_ID, receiverUser.id)
-            .whereEqualTo(Constants.KEY_RECEIVER_ID, preferenceManager.getString(Constants.KEY_USER_ID))
-            .addSnapshotListener(eventListener)
+            .whereEqualTo(Constants.KEY_SENDER_ID, currentUserId)
+            .whereEqualTo(Constants.KEY_RECEIVER_ID, receiverId)
+            .addSnapshotListener { value, error ->
+                if (error != null) {
+                    Log.e("ChatActivity", "Error fetching sent messages: ${error.message}")
+                    return@addSnapshotListener
+                }
+                Log.d("ChatActivity", "Sent messages retrieved: ${value?.documents?.size ?: 0}")
+                processMessages(value)
+            }
+
+        database.collection(Constants.KEY_COLLECTION_CHAT)
+            .whereEqualTo(Constants.KEY_SENDER_ID, receiverId)
+            .whereEqualTo(Constants.KEY_RECEIVER_ID, currentUserId)
+            .addSnapshotListener { value, error ->
+                if (error != null) {
+                    Log.e("ChatActivity", "Error fetching received messages: ${error.message}")
+                    return@addSnapshotListener
+                }
+                Log.d("ChatActivity", "Received messages retrieved: ${value?.documents?.size ?: 0}")
+                processMessages(value)
+            }
     }
+
+    private fun processMessages(value: QuerySnapshot?) {
+        if (value != null) {
+            val count = chatMessages.size
+            for (documentChange in value.documentChanges) {
+                if (documentChange.type == DocumentChange.Type.ADDED) {
+                    val document = documentChange.document
+                    val chatMessage = ChatMessage().apply {
+                        senderId = document.getString(Constants.KEY_SENDER_ID)
+                        receiverId = document.getString(Constants.KEY_RECEIVER_ID)
+                        message = document.getString(Constants.KEY_MESSAGE)
+                        dateTime = getReadableDateTime(document.getDate(Constants.KEY_TIMESTAMP)!!)
+                        dateObject = document.getDate(Constants.KEY_TIMESTAMP)
+                    }
+                    chatMessages.add(chatMessage)
+                    Log.d("ChatActivity", "Message added: $chatMessage")
+                }
+            }
+            chatMessages.sortBy { it.dateObject }
+            if (count == 0) {
+                chatAdapter.notifyDataSetChanged()
+            } else {
+                chatAdapter.notifyItemRangeInserted(count, chatMessages.size - count)
+                binding.chatRecyclerView.scrollToPosition(chatMessages.size - 1)
+            }
+            binding.chatRecyclerView.visibility = View.VISIBLE
+            binding.progressBar.visibility = View.GONE
+
+            if (conversationId == null) {
+                checkForConversation()
+            }
+        }
+    }
+
 
 
     private val eventListener = EventListener<QuerySnapshot> { value, error ->
@@ -153,8 +225,8 @@ class ChatActivity : AppCompatActivity() {
         return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
     }
 
-
-    private fun loadRecieverDetails(){
+    @Suppress("DEPRECATION")
+    private fun loadReceiverDetails(){
         receiverUser = intent.getSerializableExtra(Constants.KEY_USER) as User
         binding.textName.text = receiverUser.name
     }
@@ -217,6 +289,10 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        listenAvailabilityOfReceiver()
+    }
 
 
 }
