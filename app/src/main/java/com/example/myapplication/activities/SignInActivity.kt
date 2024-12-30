@@ -29,6 +29,15 @@ class SignInActivity : AppCompatActivity() {
 
         preferenceManager =  PreferenceManager(applicationContext)
 
+
+        // ostane ulogovan onCreate
+        if (preferenceManager.getBoolean(Constants.KEY_IS_SIGNED_IN)) {
+            val intent = Intent(applicationContext, MainActivity::class.java)
+            startActivity(intent)
+            finish()
+        }
+
+
         setListeners()
         enableEdgeToEdge()
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
