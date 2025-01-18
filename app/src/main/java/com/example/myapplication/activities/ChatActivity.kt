@@ -1,5 +1,6 @@
 package com.example.myapplication.activities
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
@@ -15,6 +16,7 @@ import com.example.myapplication.models.User
 import com.example.myapplication.utilities.Constants
 import com.example.myapplication.utilities.PreferenceManager
 import com.example.myapplication.adapters.ChatAdapter
+import com.example.myapplication.adapters.RecentConversationsAdapter
 import com.example.myapplication.models.ChatMessage
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.firestore.DocumentChange
@@ -34,6 +36,7 @@ class ChatActivity : BaseActivity() {
     private lateinit var chatMessages: MutableList<ChatMessage>
     private lateinit var chatAdapter: ChatAdapter
     private lateinit var preferenceManager: PreferenceManager
+    private lateinit var recentConversationsAdapter: RecentConversationsAdapter
     private lateinit var database: FirebaseFirestore
     private var conversationId: String? = null
     private var isReceiverAvailable: Boolean = false
@@ -235,7 +238,57 @@ class ChatActivity : BaseActivity() {
     private fun setListeners() {
         binding.imageBack.setOnClickListener { onBackPressedDispatcher.onBackPressed() }
         binding.layoutSend.setOnClickListener { sendMessage() }
+        binding.imageInfo.setOnClickListener { deleteChat() }
+
     }
+
+    private fun deleteChat() {
+        val currentUserId = preferenceManager.getString(Constants.KEY_USER_ID) ?: ""
+        val receiverId = receiverUser.id
+
+        val chatRef = database.collection(Constants.KEY_COLLECTION_CHAT)
+        chatRef
+            .whereEqualTo(Constants.KEY_SENDER_ID, currentUserId)
+            .whereEqualTo(Constants.KEY_RECEIVER_ID, receiverId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                for (document in snapshot.documents) {
+                    document.reference.delete()
+                }
+            }
+        chatRef
+            .whereEqualTo(Constants.KEY_SENDER_ID, receiverId)
+            .whereEqualTo(Constants.KEY_RECEIVER_ID, currentUserId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                for (document in snapshot.documents) {
+                    document.reference.delete()
+                }
+            }
+
+        if (conversationId != null) {
+            Log.d("ChatActivity", "conversationId: $conversationId")
+            database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                .document(conversationId!!)
+                .delete()
+                .addOnSuccessListener {
+                    Log.d("ChatActivity", "Conversation deleted successfully")
+                    val intent = Intent(applicationContext, MainActivity::class.java).apply {
+                        putExtra("REMOVE_CONVERSATION_ID", conversationId)
+                    }
+                    startActivity(intent)
+                    finish()
+                }
+                .addOnFailureListener { e ->
+                    Log.e("ChatActivity", "Error deleting conversation: ${e.message}")
+                }
+        }
+    }
+
+    private fun notifyRecentConversationsUpdated() {
+        recentConversationsAdapter?.removeConversation(conversationId!!)
+    }
+
 
     private fun getReadableDateTime(date: Date): String {
         val dateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())

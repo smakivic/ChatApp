@@ -189,4 +189,17 @@ class MainActivity : BaseActivity(), ConversationListener {
         startActivity(intent)
     }
 
+    fun removeConversation(conversationId: String) {
+        val iterator = conversations.iterator()
+        while (iterator.hasNext()) {
+            val chatMessage = iterator.next()
+            if (chatMessage.conversationId == conversationId) {
+                iterator.remove()
+                conversationsAdapter.notifyDataSetChanged()
+                break
+            }
+        }
+    }
+
+
 }
