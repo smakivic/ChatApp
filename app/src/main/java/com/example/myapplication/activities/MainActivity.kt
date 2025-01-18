@@ -71,6 +71,9 @@ class MainActivity : BaseActivity(), ConversationListener {
         binding.fabNewChat.setOnClickListener{v ->
             startActivity(Intent(applicationContext, UsersActivity::class.java))
         }
+        binding.fabAnalytics.setOnClickListener {
+            startActivity(Intent(this, AnalyticsActivity::class.java))
+        }
     }
 
     private fun loadUserDetails(){

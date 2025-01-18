@@ -15,6 +15,7 @@ roundedimageview = "2.3.0"
 firebaseMessaging = "24.1.0"
 firebaseFirestore = "25.1.1"
 multidex = "2.0.1"
+firebaseAuthKtx = "23.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -31,6 +32,7 @@ roundedimageview = { group = "com.makeramen", name = "roundedimageview", version
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging", version.ref = "firebaseMessaging" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore", version.ref = "firebaseFirestore" }
 multidex = {group = "androidx.multidex", name = "multidex", version.ref = "multidex"}
+firebase-auth-ktx = { group = "com.google.firebase", name = "firebase-auth-ktx", version.ref = "firebaseAuthKtx" }
 
 
 [plugins]
